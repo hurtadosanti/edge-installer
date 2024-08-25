@@ -2,5 +2,6 @@
 name = "start-cli"
 version = "0.1.0"
 edition = "2021"
-
+description = "Starter Cli"
+repository = "https://github.com/hurtadosanti/start-cli"
 [dependencies]
