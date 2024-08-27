@@ -1,7 +1,7 @@
 use std::error::Error;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, Write};
 use std::sync::{Arc, Mutex, Condvar};
 use std::thread;
 use std::time::Duration;
@@ -19,16 +19,16 @@ fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
             .unwrap_or(true); // If interaction fails, assume default
 
         let (lock, cvar) = &*result_clone;
-        let mut response_lock = lock.lock().unwrap();
+        let mut response_lock = lock.lock().expect("Failed to lock mutex");
         *response_lock = Some(response);
         cvar.notify_one(); // Notify that the input is received
     });
 
     let (lock, cvar) = &*result;
-    let response_lock = lock.lock().unwrap();
+    let response_lock = lock.lock().expect("Failed to lock mutex");
 
     let timeout = Duration::from_secs(timeout_secs);
-    let (response_lock, timeout_result) = cvar.wait_timeout(response_lock, timeout).unwrap();
+    let (response_lock, timeout_result) = cvar.wait_timeout(response_lock, timeout).expect("Failed to wait on condition variable");
 
     match *response_lock {
         Some(response) => response,
@@ -43,7 +43,7 @@ fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     println!("Welcome to the installation wizard.");
 
     let disks = vec!["Disk 1: /dev/sda", "Disk 2: /dev/sdb", "Disk 3: /dev/sdc"];
@@ -86,7 +86,8 @@ fn setup_installation(disks: &Vec<&str>, images: &Vec<&str>) -> Result<(), Box<d
             .with_prompt("Select a disk for installation")
             .items(&disks)
             .default(0) // Default to the first disk
-            .interact()?;
+            .interact()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to select disk: {}", e)))?;
         let selected_disk = disk_selection;
 
         // Prompt for image selection
@@ -94,13 +95,17 @@ fn setup_installation(disks: &Vec<&str>, images: &Vec<&str>) -> Result<(), Box<d
             .with_prompt("Select an image to install")
             .items(&images)
             .default(0) // Default to the first image
-            .interact()?;
+            .interact()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to select image: {}", e)))?;
         let selected_image = image_selection;
 
         // Write selections to the output file
-        let mut output_file = File::create("installation_output.txt")?;
-        writeln!(output_file, "Selected Disk: {}", disks[selected_disk])?;
-        writeln!(output_file, "Selected Image: {}", images[selected_image])?;
+        let mut output_file = File::create("installation_output.txt")
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to create output file: {}", e)))?;
+        writeln!(output_file, "Selected Disk: {}", disks[selected_disk])
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to write to output file: {}", e)))?;
+        writeln!(output_file, "Selected Image: {}", images[selected_image])
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to write to output file: {}", e)))?;
         println!("Installation configuration saved. Proceeding with installation...");
 
         // Show selected configuration
