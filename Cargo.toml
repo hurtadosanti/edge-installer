@@ -6,4 +6,3 @@ description = "Starter Cli"
 repository = "https://github.com/hurtadosanti/start-cli"
 [dependencies]
 dialoguer = "0.11.0"
-console = "0.15.8"
