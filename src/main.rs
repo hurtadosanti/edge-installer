@@ -1,5 +1,7 @@
 use std::error::Error;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
+use tokio::io;
+use tokio::io::{AsyncWriteExt};
 use tokio::time::{self, Duration};
 
 async fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
@@ -53,6 +55,11 @@ async fn handle_shutdown() {
     } else {
         println!("Shutdown aborted.");
     }
+    let mut stdout = io::stdout(); // Get async handle to stdout
+    stdout.flush().await.unwrap();
+    // Optionally reset the terminal
+    println!("\x1Bc");
+    println!("Installation was finished successfully.");
     std::process::exit(0);
 }
 
