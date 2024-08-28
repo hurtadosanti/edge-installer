@@ -1,78 +1,63 @@
 use std::error::Error;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
-use std::fs::File;
-use std::io::{self, Write};
-use std::sync::{Arc, Mutex, Condvar};
-use std::thread;
-use std::time::Duration;
+use tokio::time::{self, Duration};
 
-fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
-    let result = Arc::new((Mutex::new(None), Condvar::new()));
-    let result_clone = Arc::clone(&result);
+async fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
     let prompt_text = prompt_text.to_string();
 
-    thread::spawn(move || {
-        let response = Confirm::with_theme(&ColorfulTheme::default())
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let prompt_task = tokio::spawn(async move {
+        let result = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt(&prompt_text)
-            .default(true) // Default to 'y' (yes)
+            .default(true)
             .interact()
-            .unwrap_or(true); // If interaction fails, assume default
+            .unwrap_or(true);
 
-        let (lock, cvar) = &*result_clone;
-        let mut response_lock = lock.lock().expect("Failed to lock mutex");
-        *response_lock = Some(response);
-        cvar.notify_one(); // Notify that the input is received
+        // Send the result through the channel
+        let _ = tx.send(result);
     });
 
-    let (lock, cvar) = &*result;
-    let response_lock = lock.lock().expect("Failed to lock mutex");
-
-    let timeout = Duration::from_secs(timeout_secs);
-    let (response_lock, timeout_result) = cvar.wait_timeout(response_lock, timeout).expect("Failed to wait on condition variable");
-
-    match *response_lock {
-        Some(response) => response,
-        None => {
-            if timeout_result.timed_out() {
-                println!("\nNo response received in {} seconds. Proceeding with default.", timeout_secs);
-                true // Assume 'y' (yes) if timeout
-            } else {
-                false // This should not happen but added as a fallback
-            }
+    match time::timeout(Duration::from_secs(timeout_secs), rx).await {
+        Ok(Ok(result)) => result, // Got the result from the prompt
+        _ => {
+            // Timeout occurred or some error, so cancel the prompt task
+            prompt_task.abort();
+            println!("\nNo response received in {} seconds. Proceeding with default.", timeout_secs);
+            true
         }
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     println!("Welcome to the installation wizard.");
 
     let disks = vec!["Disk 1: /dev/sda", "Disk 2: /dev/sdb", "Disk 3: /dev/sdc"];
     let images = vec!["Image 1: Ubuntu 20.04", "Image 2: Fedora 34", "Image 3: Arch Linux"];
 
-    setup_installation(&disks, &images)?;
+    setup_installation(&disks, &images).await?;
 
-    // Proceed with the default installation if not customized
     println!("Installation started...");
-
-    thread::sleep(Duration::from_secs(3)); // Simulate installation duration
+    tokio::time::sleep(Duration::from_secs(2)).await;
     println!("Installation completed.");
 
-    handle_shutdown();
+    handle_shutdown().await;
 
     Ok(())
 }
 
-fn handle_shutdown() {
-    let shutdown = prompt_with_timeout("Do you want to abort the shutdown? (y/n)", 5);
+async fn handle_shutdown() {
+    let shutdown = prompt_with_timeout("Do you want to shutdown the system? (y/n)", 2).await;
     if shutdown {
         println!("Shutdown initiated...");
     } else {
         println!("Shutdown aborted.");
     }
+    std::process::exit(0);
 }
 
-fn setup_installation(disks: &Vec<&str>, images: &Vec<&str>) -> Result<(), Box<dyn Error>> {
-    let customize = prompt_with_timeout("Do you want to start the installation with default values? (y/n)", 5);
+async fn setup_installation(disks: &[&str], images: &[&str]) -> Result<(), Box<dyn Error>> {
+    let customize = prompt_with_timeout("Do you want to start the installation with default values? (y/n)", 2).await;
 
     if customize {
         println!("Using default installation configuration.");
@@ -81,34 +66,18 @@ fn setup_installation(disks: &Vec<&str>, images: &Vec<&str>) -> Result<(), Box<d
     } else {
         println!("Customize the installation");
 
-        // Prompt for disk selection
-        let disk_selection = Select::with_theme(&ColorfulTheme::default())
+        let selected_disk = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Select a disk for installation")
-            .items(&disks)
-            .default(0) // Default to the first disk
-            .interact()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to select disk: {}", e)))?;
-        let selected_disk = disk_selection;
+            .items(disks)
+            .default(0)
+            .interact()?;
 
-        // Prompt for image selection
-        let image_selection = Select::with_theme(&ColorfulTheme::default())
+        let selected_image = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("Select an image to install")
-            .items(&images)
-            .default(0) // Default to the first image
-            .interact()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to select image: {}", e)))?;
-        let selected_image = image_selection;
+            .items(images)
+            .default(0)
+            .interact()?;
 
-        // Write selections to the output file
-        let mut output_file = File::create("installation_output.txt")
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to create output file: {}", e)))?;
-        writeln!(output_file, "Selected Disk: {}", disks[selected_disk])
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to write to output file: {}", e)))?;
-        writeln!(output_file, "Selected Image: {}", images[selected_image])
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to write to output file: {}", e)))?;
-        println!("Installation configuration saved. Proceeding with installation...");
-
-        // Show selected configuration
         println!("Selected Disk: {}", disks[selected_disk]);
         println!("Selected Image: {}", images[selected_image]);
     }
