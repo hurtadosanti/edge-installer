@@ -1,6 +1,8 @@
+use log::debug;
 /// The `backend` module handles the core installation logic and shutdown processes.
 /// It processes the user input collected from the TUI and performs the necessary operations.
 use std::error::Error;
+
 /// Performs the installation setup based on the selected disk and image.
 ///
 /// This function outputs the selected disk and image and simulates the installation process.
@@ -12,9 +14,9 @@ use std::error::Error;
 /// # Returns
 /// * `Result<(), Box<dyn std::error::Error>>` - Returns `Ok(())` if successful, or an error if something goes wrong.
 pub async fn setup_installation(selected_disk: &str, selected_image: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting the installation process...");
-    println!("Selected Disk: {}", selected_disk);
-    println!("Selected Image: {}", selected_image);
+    debug!("Starting the installation process...");
+    debug!("Selected Disk: {}", selected_disk);
+    debug!("Selected Image: {}", selected_image);
     // Perform the installation logic with the given disk and image
     Ok(())
 }
@@ -29,12 +31,12 @@ pub async fn setup_installation(selected_disk: &str, selected_image: &str) -> Re
 /// * No return value. This function will terminate the process if shutdown is confirmed.
 pub async fn handle_shutdown(shutdown: bool) {
     if shutdown {
-        println!("Shutdown initiated...");
+        debug!("Shutdown initiated...");
     } else {
-        println!("Shutdown aborted.");
+        debug!("Shutdown aborted.");
     }
     println!("\x1Bc"); // Optionally reset the terminal
-    println!("Installation was finished successfully.");
+    debug!("Ready to exit");
     std::process::exit(0);
 }
 

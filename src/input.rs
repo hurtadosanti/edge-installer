@@ -1,6 +1,7 @@
 /// The `input` module is responsible for interacting with the user via the terminal.
 /// It provides functions for displaying prompts and receiving user input.
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
+use log::warn;
 use tokio::time::{self, Duration};
 
 /// Displays a confirmation prompt with a customizable timeout.
@@ -31,7 +32,7 @@ pub async fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
         Ok(Ok(result)) => result,
         _ => {
             prompt_task.abort();
-            println!("\nNo response received in {} seconds. Proceeding with default.", timeout_secs);
+            warn!("\nNo response received in {} seconds. Proceeding with default.", timeout_secs);
             true
         }
     }
