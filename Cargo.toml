@@ -1,9 +1,9 @@
 [package]
-name = "start-cli"
+name = "edge-installer"
 version = "0.1.0"
 edition = "2021"
-description = "Starter Cli"
-repository = "https://github.com/hurtadosanti/start-cli"
+description = "Edge Installer"
+repository = "https://github.com/hurtadosanti/edge-installer"
 [dependencies]
 dialoguer = "0.11.0"
 tokio = { version = "1.39.3", features = ["time", "rt", "rt-multi-thread", "macros", "sync", "io-util", "io-std"] }
