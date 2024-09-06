@@ -44,7 +44,7 @@ pub async fn prompt_with_timeout(prompt_text: &str, timeout_secs: u64) -> bool {
 ///
 /// # Returns
 /// * `usize` - The index of the selected disk.
-pub fn select_disk_prompt(disks: &[&str]) -> usize {
+pub fn select_disk_prompt(disks: &Vec<String>) -> usize {
     Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a disk for installation")
         .items(disks)
@@ -59,7 +59,7 @@ pub fn select_disk_prompt(disks: &[&str]) -> usize {
 ///
 /// # Returns
 /// * `usize` - The index of the selected image.
-pub fn select_image_prompt(images: &[&str]) -> usize {
+pub fn select_image_prompt(images: &Vec<String>) -> usize {
     Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select an image to install")
         .items(images)

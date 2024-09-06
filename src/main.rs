@@ -5,8 +5,12 @@ mod backend;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Welcome to the Edge Installer");
 
-    let disks = vec!["Disk 1: /dev/sda", "Disk 2: /dev/sdb", "Disk 3: /dev/sdc"];
-    let images = vec!["Image 1: Ubuntu 20.04", "Image 2: Fedora 34", "Image 3: Arch Linux"];
+    let disks = backend::load_disks()?;
+    if disks.is_empty() {
+        eprintln!("No disks found. Exiting...");
+        return Err(Box::from("No disks found"))
+    }
+    let images = backend::load_images();
 
     let customize = input::prompt_with_timeout("Do you want to start the installation with default values? (y/n)", 2).await;
 
@@ -15,12 +19,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if customize {
         println!("Using default installation configuration.");
-        selected_disk = disks[0];
-        selected_image = images[0];
+        selected_disk = &disks[0];
+        selected_image = &images[0];
     } else {
         println!("Customize the installation");
-        selected_disk = disks[input::select_disk_prompt(&disks)];
-        selected_image = images[input::select_image_prompt(&images)];
+        selected_disk = &disks[input::select_disk_prompt(&disks)];
+        selected_image = &images[input::select_image_prompt(&images)];
     }
 
     backend::setup_installation(selected_disk, selected_image).await?;
